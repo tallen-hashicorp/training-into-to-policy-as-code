@@ -1,20 +1,21 @@
 # Address of the TFC or TFE server
 param address default "app.terraform.io"
+
 # Allowed organizations for modules
 param organizations
 
 # Identify modules not in the desired PMR
 violatingMCs = filter tfconfig.module_calls as index, mc {
- mc.module_address is "" and
- not any organizations as organization {
-   strings.has_prefix(mc.source, address + "/" + organization)
- }
+	mc.module_address is "" and
+		not any organizations as organization {
+			strings.has_prefix(mc.source, address + "/" + organization)
+		}
 }
 
 # Log violations if any
 if length(violatingMCs) > 0 and not tfrun.is_destroy {
- print("All modules must come from a private module registry in these organizations:", organizations, " on server", address)
- for violatingMCs as address, mc {
-   print("Module", mc.name, "from source", mc.source, "violates policy.")
- }
+	print("All modules must come from a private module registry in these organizations:", organizations, " on server", address)
+	for violatingMCs as address, mc {
+		print("Module", mc.name, "from source", mc.source, "violates policy.")
+	}
 }
