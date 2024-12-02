@@ -34,7 +34,7 @@ Policies can be enforced at three levels. **Advisory** enforcement logs violatio
 
 This example ensures all Terraform modules come from a private module registry. If any module violates the policy, detailed violation messages are logged.
 
-```hcl
+```sentinel
 # Address of the TFC or TFE server
 param address default "app.terraform.io"
 # Allowed organizations for modules
@@ -71,7 +71,7 @@ Sentinel policies are written as `.sentinel` files and must include a `main` rul
 
 For example, a policy to check monthly cost limits might look like this:
 
-```hcl
+```sentinel
 # Main rule ensures monthly cost is below threshold
 main = rule {
    delta_monthly_cost.less_than(10)
@@ -86,7 +86,7 @@ The `main` rule can incorporate logic from other rules, enabling complex decisio
 
 Functions allow reusable logic within Sentinel policies. Declared using the `func` keyword, functions can accept parameters, perform computations, and return values. For example:
 
-```hcl
+```sentinel
 find_resources = func(resource_type) {
  # Perform operations with the parameter
  return true
@@ -104,7 +104,7 @@ Sentinel integrates deeply with Terraform through **imports**, providing access 
 ### Using `tfplan/v2`
 The `tfplan` import validates attributes in the current Terraform plan. For instance, you can enforce instance types allowed by your organization:
 
-```hcl
+```sentinel
 import "tfplan/v2" as tfplan
 
 # Enforce allowed instance types
@@ -116,7 +116,7 @@ main = rule {
 ### Using `tfconfig/v2`
 The `tfconfig` import validates configurations such as providers, modules, and variables. 
 
-```hcl
+```sentinel
 import "tfconfig"
 
 # Check for AWS provider in configuration
@@ -128,7 +128,7 @@ main = rule {
 ### Using `tfstate/v2`
 The `tfstate` import ensures previously provisioned resources maintain compliant attributes.
 
-```hcl
+```sentinel
 import "tfstate"
 
 # Allowed values for resource attributes
@@ -141,7 +141,7 @@ allowed_values = {
 ### Using `tfrun`
 The `tfrun` import examines metadata such as cost estimates or workspace attributes.
 
-```hcl
+```sentinel
 import "tfrun"
 
 # Calculate proposed monthly cost
