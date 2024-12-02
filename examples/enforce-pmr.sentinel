@@ -1,21 +1,80 @@
-# Address of the TFC or TFE server
-param address default "app.terraform.io"
+# This policy uses the tfconfig/v2 import to restrict providers to those
+# in an allowed list.
 
-# Allowed organizations for modules
-param organizations
+# It used to only use the providers collection of the tfconfig/v2 import, but
+# that did not process resources and data sources from allowed providers
+# when no provider block was included in the Terraform configuration. So, it now
+# also explicitly allows resources and data sources from allowed providers using
+# the resources collection of the tfconfig/v2 import.
 
-# Identify modules not in the desired PMR
-violatingMCs = filter tfconfig.module_calls as index, mc {
-	mc.module_address is "" and
-		not any organizations as organization {
-			strings.has_prefix(mc.source, address + "/" + organization)
-		}
+# Import common-functions/tfconfig-functions/tfconfig-functions.sentinel
+# with alias "config"
+import "tfconfig-functions" as config
+
+# Standard strings import
+import "strings"
+
+# List of allowed providers
+allowed_list = ["aws", "local", "null", "random", "terraform", "tfe"]
+
+# Get all providers
+allProviders = config.find_all_providers()
+
+# Filter to providers with violations
+# Warnings will not be printed for violations since the last parameter is false
+violatingProviders = config.filter_attribute_not_in_list(allProviders,
+                     "name", allowed_list, false)
+
+# Print any violations
+prohibitedProvidersCount = length(violatingProviders["messages"])
+if prohibitedProvidersCount > 0 {
+  config.print_violations(violatingProviders["messages"], "Provider")
 }
 
-# Log violations if any
-if length(violatingMCs) > 0 and not tfrun.is_destroy {
-	print("All modules must come from a private module registry in these organizations:", organizations, " on server", address)
-	for violatingMCs as address, mc {
-		print("Module", mc.name, "from source", mc.source, "violates policy.")
-	}
+# Initialize resource and data source counts
+prohibitedResourcesCount = 0
+prohibitedDataSourcesCount = 0
+
+# Find all resources
+allResources = config.find_all_resources()
+
+# Filter to disallowed resources
+prohibitedResources = filter allResources as address, r {
+  strings.split(r.type, "_")[0] not in allowed_list
+}
+
+# Print violations and increment counts for resources
+if length(prohibitedResources) > 0 {
+  print("Resources from providers are not allowed unless they are in", allowed_list)
+  prohibitedResourcesCount += length(prohibitedResources)
+  for prohibitedResources as address, r {
+    print("Resource", address, "from provider", strings.split(r.type, "_")[0],
+          "is not allowed.")
+  } // end for prohibitedResources
+} // end if
+
+
+# Find all data sources
+allDataSources = config.find_all_datasources()
+
+# Filter to disallowed data sources
+prohibitedDataSources = filter allDataSources as address, r {
+  strings.split(r.type, "_")[0] not in allowed_list
+}
+
+# Print violations and increment counts for data sources
+if length(prohibitedDataSources) > 0 {
+  print("Data sources from providers are not allowed unless they are in", allowed_list)
+  prohibitedDataSourcesCount += length(prohibitedDataSources)
+  for prohibitedDataSources as address, r {
+    print("Data source", address, "from provider", strings.split(r.type, "_")[0],
+          "is not allowed.")
+  } // end for prohibitedDataSources
+} // end if
+
+# Main rule
+violations = prohibitedProvidersCount + prohibitedResourcesCount +
+             prohibitedDataSourcesCount
+main = rule {
+  violations is 0
 }
